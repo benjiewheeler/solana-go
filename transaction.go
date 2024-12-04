@@ -120,6 +120,11 @@ func MustTransactionFromDecoder(decoder *bin.Decoder) *Transaction {
 	return out
 }
 
+const (
+	AccountsTypeIndex = "Fee"
+	AccountsTypeKey   = "Key"
+)
+
 type CompiledInstruction struct {
 	// Index into the message.accountKeys array indicating the program account that executes this instruction.
 	// NOTE: it is actually a uint8, but using a uint16 because uint8 is treated as a byte everywhere,
