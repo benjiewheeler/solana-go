@@ -254,6 +254,19 @@ type CompiledInstruction struct {
 	StackHeight uint16 `json:"stackHeight"`
 }
 
+func (ci CompiledInstruction) ResolveInstructionAccounts(message *solana.Message) ([]*solana.AccountMeta, error) {
+	out := make([]*solana.AccountMeta, len(ci.Accounts))
+	metas, err := message.AccountMetaList()
+	if err != nil {
+		return nil, err
+	}
+	for i, acct := range ci.Accounts {
+		out[i] = metas[acct]
+	}
+
+	return out, nil
+}
+
 // Ok  interface{} `json:"Ok"`  // <null> Transaction was successful
 // Err interface{} `json:"Err"` // Transaction failed with TransactionError
 type DeprecatedTransactionMetaStatus M
