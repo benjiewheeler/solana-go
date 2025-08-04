@@ -173,6 +173,23 @@ const (
 
 	// Like InitializeMint, but does not require the Rent sysvar to be provided.
 	Instruction_InitializeMint2
+
+	// Gets the required size of an account for the given mint as a
+	// little-endian `u64`.
+	Instruction_GetAccountDataSize
+
+	// Initialize the Immutable Owner extension for the given token account
+	Instruction_InitializeImmutableOwner
+
+	// Convert an Amount of tokens to a `UiAmount` string, using the given
+	// mint. In this version of the program, the mint can only specify the
+	// number of decimals.
+	Instruction_AmountToUiAmount
+
+	// Convert a `UiAmount` of tokens to a little-endian `u64` raw Amount,
+	// using the given mint. In this version of the program, the mint can
+	// only specify the number of decimals.
+	Instruction_UiAmountToAmount
 )
 
 // InstructionIDToName returns the name of the instruction given its ID.
@@ -220,6 +237,14 @@ func InstructionIDToName(id uint8) string {
 		return "InitializeMultisig2"
 	case Instruction_InitializeMint2:
 		return "InitializeMint2"
+	case Instruction_GetAccountDataSize:
+		return "GetAccountDataSize"
+	case Instruction_InitializeImmutableOwner:
+		return "InitializeImmutableOwner"
+	case Instruction_AmountToUiAmount:
+		return "AmountToUiAmount"
+	case Instruction_UiAmountToAmount:
+		return "UiAmountToAmount"
 	default:
 		return ""
 	}
@@ -302,6 +327,18 @@ var InstructionImplDef = ag_binary.NewVariantDefinition(
 		},
 		{
 			"InitializeMint2", (*InitializeMint2)(nil),
+		},
+		{
+			"GetAccountDataSize", (*GetAccountDataSize)(nil),
+		},
+		{
+			"InitializeImmutableOwner", (*InitializeImmutableOwner)(nil),
+		},
+		{
+			"AmountToUiAmount", (*AmountToUiAmount)(nil),
+		},
+		{
+			"UiAmountToAmount", (*UiAmountToAmount)(nil),
 		},
 	},
 )
