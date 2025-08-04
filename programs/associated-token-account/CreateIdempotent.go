@@ -15,20 +15,15 @@
 package associatedtokenaccount
 
 import (
-	"errors"
 	"fmt"
 
-	bin "github.com/gagliardetto/binary"
-	solana "github.com/gagliardetto/solana-go"
-	format "github.com/gagliardetto/solana-go/text/format"
-	treeout "github.com/gagliardetto/treeout"
+	ag_binary "github.com/gagliardetto/binary"
+	ag_solanago "github.com/gagliardetto/solana-go"
+	ag_format "github.com/gagliardetto/solana-go/text/format"
+	ag_treeout "github.com/gagliardetto/treeout"
 )
 
 type CreateIdempotent struct {
-	Payer  solana.PublicKey `bin:"-" borsh_skip:"true"`
-	Wallet solana.PublicKey `bin:"-" borsh_skip:"true"`
-	Mint   solana.PublicKey `bin:"-" borsh_skip:"true"`
-
 	// [0] = [WRITE, SIGNER] Payer
 	// ··········· Funding account
 	//
@@ -49,82 +44,80 @@ type CreateIdempotent struct {
 	//
 	// [6] = [] SysVarRent
 	// ··········· SysVarRentPubkey
-	solana.AccountMetaSlice `bin:"-" borsh_skip:"true"`
+	ag_solanago.AccountMetaSlice `bin:"-" borsh_skip:"true"`
 }
 
 // NewCreateIdempotentInstructionBuilder creates a new `CreateIdempotent` instruction builder.
 func NewCreateIdempotentInstructionBuilder() *CreateIdempotent {
-	nd := &CreateIdempotent{}
+	nd := &CreateIdempotent{
+		AccountMetaSlice: make(ag_solanago.AccountMetaSlice, 7),
+	}
+	nd.AccountMetaSlice[4] = ag_solanago.Meta(ag_solanago.SystemProgramID)
+	nd.AccountMetaSlice[5] = ag_solanago.Meta(ag_solanago.TokenProgramID)
+	nd.AccountMetaSlice[6] = ag_solanago.Meta(ag_solanago.SysVarRentPubkey)
 	return nd
 }
 
-func (inst *CreateIdempotent) SetPayer(payer solana.PublicKey) *CreateIdempotent {
-	inst.Payer = payer
+func (inst *CreateIdempotent) SetPayer(payer ag_solanago.PublicKey) *CreateIdempotent {
+	inst.AccountMetaSlice[0] = ag_solanago.Meta(payer).WRITE().SIGNER()
 	return inst
 }
 
-func (inst *CreateIdempotent) SetWallet(wallet solana.PublicKey) *CreateIdempotent {
-	inst.Wallet = wallet
+func (inst CreateIdempotent) GetPayer() *ag_solanago.AccountMeta {
+	return inst.AccountMetaSlice[0]
+}
+
+func (inst *CreateIdempotent) SetAssociatedTokenAccount(associatedTokenAccount ag_solanago.PublicKey) *CreateIdempotent {
+	inst.AccountMetaSlice[1] = ag_solanago.Meta(associatedTokenAccount).WRITE()
 	return inst
 }
 
-func (inst *CreateIdempotent) SetMint(mint solana.PublicKey) *CreateIdempotent {
-	inst.Mint = mint
+func (inst CreateIdempotent) GetAssociatedTokenAccount() *ag_solanago.AccountMeta {
+	return inst.AccountMetaSlice[1]
+}
+
+func (inst *CreateIdempotent) SetWallet(wallet ag_solanago.PublicKey) *CreateIdempotent {
+	inst.AccountMetaSlice[2] = ag_solanago.Meta(wallet)
 	return inst
+}
+
+func (inst CreateIdempotent) GetWallet() *ag_solanago.AccountMeta {
+	return inst.AccountMetaSlice[2]
+}
+
+func (inst *CreateIdempotent) SetMint(mint ag_solanago.PublicKey) *CreateIdempotent {
+	inst.AccountMetaSlice[3] = ag_solanago.Meta(mint)
+	return inst
+}
+
+func (inst CreateIdempotent) GetMint() *ag_solanago.AccountMeta {
+	return inst.AccountMetaSlice[3]
+}
+
+func (inst *CreateIdempotent) SetTokenProgramID(tokenProgramID ag_solanago.PublicKey) *CreateIdempotent {
+	inst.AccountMetaSlice[5] = ag_solanago.Meta(tokenProgramID)
+	return inst
+}
+
+func (inst CreateIdempotent) GetTokenProgramID() *ag_solanago.AccountMeta {
+	return inst.AccountMetaSlice[5]
 }
 
 func (inst CreateIdempotent) Build() *Instruction {
+	if ata := inst.AccountMetaSlice[1]; ata == nil || ata.PublicKey.IsZero() {
+		// Find the associatedTokenAddress;
+		associatedTokenAddress, _, _ := ag_solanago.FindAssociatedTokenAddress(
+			inst.GetWallet().PublicKey,
+			inst.GetMint().PublicKey,
+			inst.GetTokenProgramID().PublicKey,
+		)
 
-	// Find the associatedTokenAddress;
-	associatedTokenAddress, _, _ := solana.FindAssociatedTokenAddress(
-		inst.Wallet,
-		inst.Mint,
-		TokenProgramID,
-	)
-
-	keys := []*solana.AccountMeta{
-		{
-			PublicKey:  inst.Payer,
-			IsSigner:   true,
-			IsWritable: true,
-		},
-		{
-			PublicKey:  associatedTokenAddress,
-			IsSigner:   false,
-			IsWritable: true,
-		},
-		{
-			PublicKey:  inst.Wallet,
-			IsSigner:   false,
-			IsWritable: false,
-		},
-		{
-			PublicKey:  inst.Mint,
-			IsSigner:   false,
-			IsWritable: false,
-		},
-		{
-			PublicKey:  solana.SystemProgramID,
-			IsSigner:   false,
-			IsWritable: false,
-		},
-		{
-			PublicKey:  TokenProgramID,
-			IsSigner:   false,
-			IsWritable: false,
-		},
-		{
-			PublicKey:  solana.SysVarRentPubkey,
-			IsSigner:   false,
-			IsWritable: false,
-		},
+		inst.SetAssociatedTokenAccount(associatedTokenAddress)
 	}
 
-	inst.AccountMetaSlice = keys
-
-	return &Instruction{BaseVariant: bin.BaseVariant{
+	return &Instruction{BaseVariant: ag_binary.BaseVariant{
 		Impl:   inst,
-		TypeID: bin.TypeIDFromUint8(Instruction_CreateIdempotent),
+		TypeID: ag_binary.TypeIDFromUint8(Instruction_CreateIdempotent),
 	}}
 }
 
@@ -139,66 +132,67 @@ func (inst CreateIdempotent) ValidateAndBuild() (*Instruction, error) {
 }
 
 func (inst *CreateIdempotent) Validate() error {
-	if inst.Payer.IsZero() {
-		return errors.New("Payer not set")
+	if ata := inst.AccountMetaSlice[1]; ata == nil || ata.PublicKey.IsZero() {
+		// Find the associatedTokenAddress;
+		associatedTokenAddress, _, _ := ag_solanago.FindAssociatedTokenAddress(
+			inst.GetWallet().PublicKey,
+			inst.GetMint().PublicKey,
+			inst.GetTokenProgramID().PublicKey,
+		)
+
+		inst.SetAssociatedTokenAccount(associatedTokenAddress)
 	}
-	if inst.Wallet.IsZero() {
-		return errors.New("Wallet not set")
-	}
-	if inst.Mint.IsZero() {
-		return errors.New("Mint not set")
-	}
-	_, _, err := solana.FindAssociatedTokenAddress(
-		inst.Wallet,
-		inst.Mint,
-		TokenProgramID,
-	)
-	if err != nil {
-		return fmt.Errorf("error while FindAssociatedTokenAddress: %w", err)
+
+	// Check whether all accounts are set:
+	for accIndex, acc := range inst.AccountMetaSlice {
+		if acc == nil {
+			return fmt.Errorf("ins.AccountMetaSlice[%v] is not set", accIndex)
+		}
 	}
 	return nil
 }
 
-func (inst *CreateIdempotent) EncodeToTree(parent treeout.Branches) {
-	parent.Child(format.Program(ProgramName, ProgramID)).
+func (inst *CreateIdempotent) EncodeToTree(parent ag_treeout.Branches) {
+	parent.Child(ag_format.Program(ProgramName, ProgramID)).
 		//
-		ParentFunc(func(programBranch treeout.Branches) {
-			programBranch.Child(format.Instruction("CreateIdempotent")).
+		ParentFunc(func(programBranch ag_treeout.Branches) {
+			programBranch.Child(ag_format.Instruction("CreateIdempotent")).
 				//
-				ParentFunc(func(instructionBranch treeout.Branches) {
-
+				ParentFunc(func(instructionBranch ag_treeout.Branches) {
 					// Parameters of the instruction:
-					instructionBranch.Child("Params[len=0]").ParentFunc(func(paramsBranch treeout.Branches) {})
+					instructionBranch.Child("Params[len=0]").ParentFunc(func(paramsBranch ag_treeout.Branches) {})
 
 					// Accounts of the instruction:
-					instructionBranch.Child("Accounts[len=7").ParentFunc(func(accountsBranch treeout.Branches) {
-						accountsBranch.Child(format.Meta("                 payer", inst.AccountMetaSlice.Get(0)))
-						accountsBranch.Child(format.Meta("associatedTokenAddress", inst.AccountMetaSlice.Get(1)))
-						accountsBranch.Child(format.Meta("                wallet", inst.AccountMetaSlice.Get(2)))
-						accountsBranch.Child(format.Meta("             tokenMint", inst.AccountMetaSlice.Get(3)))
-						accountsBranch.Child(format.Meta("         systemProgram", inst.AccountMetaSlice.Get(4)))
-						accountsBranch.Child(format.Meta("          tokenProgram", inst.AccountMetaSlice.Get(5)))
-						accountsBranch.Child(format.Meta("            sysVarRent", inst.AccountMetaSlice.Get(6)))
+					instructionBranch.Child("Accounts[len=7").ParentFunc(func(accountsBranch ag_treeout.Branches) {
+						accountsBranch.Child(ag_format.Meta("                 payer", inst.Get(0)))
+						accountsBranch.Child(ag_format.Meta("associatedTokenAddress", inst.Get(1)))
+						accountsBranch.Child(ag_format.Meta("                wallet", inst.Get(2)))
+						accountsBranch.Child(ag_format.Meta("             tokenMint", inst.Get(3)))
+						accountsBranch.Child(ag_format.Meta("         systemProgram", inst.Get(4)))
+						accountsBranch.Child(ag_format.Meta("          tokenProgram", inst.Get(5)))
+						accountsBranch.Child(ag_format.Meta("            sysVarRent", inst.Get(6)))
 					})
 				})
 		})
 }
 
-func (inst CreateIdempotent) MarshalWithEncoder(encoder *bin.Encoder) error {
+func (inst CreateIdempotent) MarshalWithEncoder(encoder *ag_binary.Encoder) error {
 	return encoder.WriteBytes([]byte{}, false)
 }
 
-func (inst *CreateIdempotent) UnmarshalWithDecoder(decoder *bin.Decoder) error {
+func (inst *CreateIdempotent) UnmarshalWithDecoder(decoder *ag_binary.Decoder) error {
 	return nil
 }
 
 func NewCreateIdempotentInstruction(
-	payer solana.PublicKey,
-	walletAddress solana.PublicKey,
-	splTokenMintAddress solana.PublicKey,
+	payer ag_solanago.PublicKey,
+	walletAddress ag_solanago.PublicKey,
+	splTokenMintAddress ag_solanago.PublicKey,
+	tokenProgramID ag_solanago.PublicKey,
 ) *CreateIdempotent {
 	return NewCreateIdempotentInstructionBuilder().
 		SetPayer(payer).
 		SetWallet(walletAddress).
-		SetMint(splTokenMintAddress)
+		SetMint(splTokenMintAddress).
+		SetTokenProgramID(tokenProgramID)
 }
