@@ -19,8 +19,6 @@ package solana
 
 import (
 	"errors"
-	"fmt"
-	"reflect"
 	"sync"
 )
 
@@ -78,20 +76,7 @@ func (reg *decoderRegistry) RegisterIfNew(programID PublicKey, decoder Instructi
 }
 
 func RegisterInstructionDecoder(programID PublicKey, decoder InstructionDecoder) {
-	prev, has := instructionDecoderRegistry.Get(programID)
-	if has {
-		// If it's the same function, then OK (tollerate multiple calls with same params).
-		if isSameFunction(prev, decoder) {
-			return
-		}
-		// If it's another decoder for the same pubkey, then panic.
-		panic(fmt.Sprintf("unable to re-register instruction decoder for program %s", programID))
-	}
 	instructionDecoderRegistry.RegisterIfNew(programID, decoder)
-}
-
-func isSameFunction(f1 interface{}, f2 interface{}) bool {
-	return reflect.ValueOf(f1).Pointer() == reflect.ValueOf(f2).Pointer()
 }
 
 func DecodeInstruction(programID PublicKey, accounts []*AccountMeta, data []byte) (interface{}, error) {
